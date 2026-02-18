@@ -1,3 +1,5 @@
+// IGNORE THIS FOR NOW ITLL BE FOR THE FULL FULL RELEASE VERSION
+
 require ("dotenv").config();
 const { App } = require("@slack/bolt");
 const Databse = requite("better-sqlite3");
@@ -105,9 +107,8 @@ function hitsTarget(text, target) {
 
     if (t.includes(" ")) return lower.includes(t);
     
-----------------------------------------------------------------------------------------------
-    const escaped = t.replace();
-    const re = new RegExp(Exp())
+    const escaped = t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const re = new RegExp(`\\b${escaped}\\b`, "i");
     return re.test(text);
 }
 

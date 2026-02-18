@@ -1,0 +1,13 @@
+personal notes for slack api bc IM SICK OF CONSTANTLY
+GOING BACK AND FORTH ON THE PAGE
+
+link in case i lose it :p
+https://docs.slack.dev/
+
+might need to check https://docs.slack.dev/enterprise/developing-for-enterprise-orgs
+since we enterprise nowwwww
+
+
+holy moly they have a jp version lmaooo
+https://docs.slack.dev/ja-jp/
+use this increase comprehension??
