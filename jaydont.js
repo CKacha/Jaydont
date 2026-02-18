@@ -12,6 +12,8 @@ const ALLOWED_CHANNEL_IDS = [
     C0A1X4BUD9N, //campfire-usa
 ];
 
+const REPORT_CHANNEL_ID = C0AGGGEBZFA //Jaydontreports join if ya want lmao
+
 const REPORT_EVERY_MS = 24 *60 * 60 * 1000;
 
 const WATCH_ALL_INVITED_CHANNELS = false;
@@ -70,6 +72,14 @@ app.command("/jaycount", async ({ ack, respond }) => {
     await respond(`Total "jay don'ts: *${total}*`);
 });
 
+async function sendDailyReport() {
+    const total = getCount();
+    await app.client.chat.postMessage({
+        channel: REPORT_CHANNEL_ID,
+        text: `Current number of jays: *${total}*`,
+    });
+}
+
 (async () => {
     if (!process.env.SLACK_BOT_TOKEN || !process.env.SLACK_APP_TOKEN) {
         console.error("Missing SLACK_BOT_TOKEN or SLACK_APP_TOKEN env sob");
@@ -77,4 +87,18 @@ app.command("/jaycount", async ({ ack, respond }) => {
     }
     await app.start();
     console.log(' Searching for "Jay dont" in channels: ' + (WATCH_ALL_INVITED_CHANNELS ? "ALL CHANNELS" : ALLOWED_CHANNEL_IDS.join(", ")));
-})
+
+    try {
+        await sendDailyReport();
+    } catch (e) {
+        console.error("Daily report failed (startup) SOB", e?.data || e?.message || e);
+    }
+
+    setInterval(async () => {
+        try {
+            await sendDailyReport();
+        } catch (e) {
+            console.error("Daily report failed:", e?.data || e?.message || e);
+        }
+    }, REPORT_EVERY_MS);
+});

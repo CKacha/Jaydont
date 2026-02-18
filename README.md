@@ -7,7 +7,14 @@ How many
 
 If you have any questions/get any error logs PLEASE DM @Iamlive, I WILL MAKE THIS THING WORK IF ITS THE LAST THING I DO
 
+GO FIRST JOIN #jay
+
 Go to any channel, and add the @Jaydont bot!
+
+
+
+
+# IGNORE THIS PART, THIS FOR THE FULL RELEASE
 
 Unfortunantly only admins have access for the tracked word(s)/phrase(s), but you can run a couple commands to check out how much has been tracked so far!
 
