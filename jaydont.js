@@ -124,4 +124,4 @@ async function sendDailyReport() {
             console.error("Daily report failed:", e?.data || e?.message || e);
         }
     }, REPORT_EVERY_MS);
-});
+})();
