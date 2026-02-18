@@ -1,18 +1,18 @@
 //simple workflow bc I wanna get the bot up asap
 
-requestAnimationFrame("dotenv").config();
+require("dotenv").config();
 const { App } = require("@slack/bolt");
 const Database = require("better-sqlite3");
 const { get } = require("node:http");
 
 // put CHANNELS HERE WHEN YOU WAKE UP
 const ALLOWED_CHANNEL_IDS = [
-    C09KRBRRPEX, //campfire-bulletin
-    C09PXLPEL2Y, //campfire,
-    C0A1X4BUD9N, //campfire-usa
+    "C09KRBRRPEX", //campfire-bulletin
+    "C09PXLPEL2Y", //campfire,
+    "C0A1X4BUD9N", //campfire-usa
 ];
 
-const REPORT_CHANNEL_ID = C0AGGGEBZFA //Jaydontreports join if ya want lmao
+const REPORT_CHANNEL_ID = "C0AGGGEBZFA" //Jaydontreports join if ya want lmao
 
 const REPORT_EVERY_MS = 24 *60 * 60 * 1000;
 
