@@ -2,17 +2,40 @@
 
 require("dotenv").config();
 const { App } = require("@slack/bolt");
-const Database = require("better-sqlite3");
-const { get } = require("node:http");
+// const Database = require("better-sqlite3");
+// const { get } = require("node:http");
+const fs = require("fs");
 
-// put CHANNELS HERE WHEN YOU WAKE UP
+const FILE = "jaydont.csv";
+
+if (!fs.existsSync(FILE)) {
+    fs.writeFileSync(FILE, "count\n0", "utf8");
+}
+
+function getCount() {
+    const lines = fs.readFileSynce(FILE, "utf8").trim().split("\n");
+    const n = parseInt(lines[1] || "0", 10);    
+    return Number.isFinite(n) ? n : 0;
+}
+
+function setCount(n) {
+    fs.writeFileSync(FILE, `count\n${n}`, "utf8");
+}
+
+function incrementAndGet() {
+    const n = getCount() + 1;
+    setCount(n);
+    return n;
+}
+
+// put CHANNELS HERE WHEN YOU WAKE UP nvm i stayed up
 const ALLOWED_CHANNEL_IDS = [
     "C09KRBRRPEX", //campfire-bulletin
     "C09PXLPEL2Y", //campfire,
     "C0A1X4BUD9N", //campfire-usa
 ];
 
-const REPORT_CHANNEL_ID = "C0AGGGEBZFA" //Jaydontreports join if ya want lmao
+const REPORT_CHANNEL_ID = "C0AGGGEBZFA"; //Jaydontreports join if ya want lmao
 
 const REPORT_EVERY_MS = 24 *60 * 60 * 1000;
 
@@ -20,25 +43,25 @@ const WATCH_ALL_INVITED_CHANNELS = false;
 
 const PHRASE = "jay dont";
 
-const db = new Database("jaydont.db");
-db.pragma("journal_mode = WAL");
+// const db = new Database("jaydont.csv");
+// db.pragma("journal_mode = WAL");
 
-db.exec(`
-    CREATE TABLE IF NOT EXISTS counter (
-        id INTEGER PRIMARY KEY CHECK (id = 1),
-        count INTEGER NOT NULL DEFAULT 0)
-    );
-    INSERT OR IGNORE INTO counter(id, count) VALUES (1, 0);
-`);
+// db.exec(`
+//     CREATE TABLE IF NOT EXISTS counter (
+//         id INTEGER PRIMARY KEY CHECK (id = 1),
+//         count INTEGER NOT NULL DEFAULT 0)
+//     );
+//     INSERT OR IGNORE INTO counter(id, count) VALUES (1, 0);
+// `);
 
-function incrementAndGet() {
-    db.prepare("UPDATE counter SET count = couunt + 1 WHERE id = 1").run();
-    return db.prepare("SELECT count FROM counter WHERE id = 1").get().count;
-}
+// function incrementAndGet() {
+//     db.prepare("UPDATE counter SET count = couunt + 1 WHERE id = 1").run();
+//     return db.prepare("SELECT count FROM counter WHERE id = 1").get().count;
+// }
 
-function getCount() {
-    return db.prepare("SELECT count FROM counter WHERE id = 1").get().count;
-}
+// function getCount() {
+//     return db.prepare("SELECT count FROM counter WHERE id = 1").get().count;
+// }
 
 const app = new App({
     token: process.env.SLACK_BOT_TOKEN,
@@ -56,7 +79,7 @@ app.event("message", async ({ event }) => {
     if (event.bot_id) return;
 
     if (!WATCH_ALL_INVITED_CHANNELS) {
-        if (!WATCH_ALL_INVITED_CHANNELS.includes(event.channel)) return;
+        if (!ALLOWED_CHANNEL_IDS.includes(event.channel)) return;
     }
 
     const text = event.text || "";
@@ -69,7 +92,7 @@ app.event("message", async ({ event }) => {
 app.command("/jaycount", async ({ ack, respond }) => {
     await ack();
     const total = getCount();
-    await respond(`Total "jay don'ts: *${total}*`);
+    await respond(`Total "jay dont": *${total}*`);
 });
 
 async function sendDailyReport() {
