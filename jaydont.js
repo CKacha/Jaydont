@@ -1,10 +1,19 @@
 //simple workflow bc I wanna get the bot up asap
 
+
+const JAY_DONT_RE = /\bjay\s*don'?t\b/i;
+
+function containsJayDont(text) {
+  if (!text) return false;
+  return JAY_DONT_RE.test(text);
+}
+
 require("dotenv").config();
 const { App } = require("@slack/bolt");
 // const Database = require("better-sqlite3");
 // const { get } = require("node:http");
 const fs = require("fs");
+
 
 const FILE = "jaydont.csv";
 
@@ -41,7 +50,7 @@ const REPORT_EVERY_MS = 24 *60 * 60 * 1000;
 
 const WATCH_ALL_INVITED_CHANNELS = false;
 
-const PHRASE = "jay dont";
+// const PHRASE = "jay dont";
 
 // const db = new Database("jaydont.csv");
 // db.pragma("journal_mode = WAL");
@@ -69,12 +78,13 @@ const app = new App({
     socketMode: true
 });
 
-function containsJayDont(text) {
-    if (!text) return false;
-    return text.toLowerCase().includes(PHRASE);
-}
+// function containsJayDont(text) {
+//     if (!text) return false;
+//     return text.toLowerCase().includes(PHRASE);
+// }
 
 app.event("message", async ({ event }) => {
+    console.log("EVENT:", event.channel, JSON.stringify(event.text));
     if (event.subtype) return;
     if (event.bot_id) return;
 
@@ -85,7 +95,8 @@ app.event("message", async ({ event }) => {
     const text = event.text || "";
     if (containsJayDont(text)) {
         const total = incrementAndGet();
-        console.log(`Counted "${PHRASE}" => total ${total}`);
+        // console.log(`Counted "${PHRASE}" => total ${total}`);
+        console.log(`Counted jay don't => total ${total}`);
     }
 });
 
@@ -102,6 +113,27 @@ async function sendDailyReport() {
         text: `Current number of jays: *${total}*`,
     });
 }
+
+// app.event("message", async ({ event }) => {
+//     console.log("got message:", {
+//         channel: event.channel,
+//         text: event.text,
+//         thread_ts: event.thread_ts,
+//         subtype: event.subtype
+//     });
+
+//     if (event.subtype) return;
+//     if(event.bot_id) return;
+
+//     if (!WATCH_ALL_INVITED_CHANNELS) {
+//         if (!ALLOWED_CHANNEL_IDS.includes(event.channel)) return;
+//     }
+
+//     if (containsJayDont(event.text)) {
+//         const total = incrementAndGet();
+//         console.log(`Counted => total ${total}`);
+//     }
+// });
 
 (async () => {
     if (!process.env.SLACK_BOT_TOKEN || !process.env.SLACK_APP_TOKEN) {
