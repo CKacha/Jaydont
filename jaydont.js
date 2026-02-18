@@ -13,7 +13,7 @@ if (!fs.existsSync(FILE)) {
 }
 
 function getCount() {
-    const lines = fs.readFileSynce(FILE, "utf8").trim().split("\n");
+    const lines = fs.readFileSync(FILE, "utf8").trim().split("\n");
     const n = parseInt(lines[1] || "0", 10);    
     return Number.isFinite(n) ? n : 0;
 }
