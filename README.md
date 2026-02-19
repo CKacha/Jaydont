@@ -1,13 +1,31 @@
 # Jaydont
 Slack bot that scraps campfire channels for jay dont
 
-How many 
+FIRST OF ALL GO JOIN #jaydontlogs
+
+CURRENTLY TRACKED CHANNELS:
+ - #campfire
+ - #campfire-bulletin
+ - #campfire-usa
+
+Maybe I'll add more soon....
+
+# WHAT IT DOES:
+
+Tracks all variations of someone saying "Jay don't"
+
+Such as:
+- "jay dont"
+- "JAY DONT"
+- "jay                dont"
+
+Also backfills all(self-defined) channel history to display how many times it was said!
+
+There will be a daily number of how many times it was said in #jaydontreports, and you can also use /jaycount to see for yourself in real time!
 
 # HOW TO USE/RUN 
 
-If you have any questions/get any error logs PLEASE DM @Iamlive, I WILL MAKE THIS THING WORK IF ITS THE LAST THING I DO
-
-GO FIRST JOIN #jaydontlogs
+If you have any questions/get any error logs PLEASE DM **@Iamlive**, I WILL MAKE THIS THING WORK IF ITS THE LAST THING I DO
 
 Go to any channel, and add the @Jaydont bot!
 (it won't track how many times jay dont is said, but it will let you run the one command avalible :D )

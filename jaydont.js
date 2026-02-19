@@ -16,7 +16,7 @@ const WATCH_ALL_INVITED_CHANNELS = false;
 const REPORT_CHANNEL_ID = "C0AGGGEBZFA"; //Jaydontreports
 const REPORT_EVERY_MS = 24 *60 * 60 * 1000;
 
-const BACKFILL_DAYS = 7;
+const BACKFILL_DAYS = 60; // ts gonna take a while SOB
 
 const JAY_DONT_RE_GLOBAL = /\bjay\s+don'?t\b/gi;
 
