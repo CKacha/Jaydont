@@ -1,11 +1,6 @@
 require("dotenv").config();
 const { App } = require("@slack/bolt");
-const { count } = require("console");
-const { ALL } = require("dns");
 const fs = require("fs");
-// might use these idk
-// const Database = require("better-sqlite3");
-// const { get } = require("node:http");
 
 const ALLOWED_CHANNEL_IDS = [
     "C09KRBRRPEX", //campfire-bulletin
@@ -21,9 +16,9 @@ const WATCH_ALL_INVITED_CHANNELS = false;
 const REPORT_CHANNEL_ID = "C0AGGGEBZFA"; //Jaydontreports
 const REPORT_EVERY_MS = 24 *60 * 60 * 1000;
 
-const BACKFILL_DAYS = 60;
+const BACKFILL_DAYS = 7;
 
-const JAY_DONT_RE_GLOBAL = /\bjay\s+don'?t\b/ig;
+const JAY_DONT_RE_GLOBAL = /\bjay\s+don'?t\b/gi;
 
 const STATE_FILE = "jaydont_state.csv";
 
@@ -35,8 +30,8 @@ function ensureStateFile() {
 
 function loadState() {
     ensureStateFile();
-    const lines = fs.readFileSync(STATE_FILE, "utf8").trim().split("\n");
-    const row = (lines[1] || "0,0")/split(",");
+    const lines = fs.readFileSync(STATE_FILE, "utf8").trim().split(/\r?\n/);
+    const row = (lines[1] || "0,0").split(",");
     const count = parseInt(row[0] || "0", 10);
     const lastTs = parseFloat(row[1] || "0");
     return {
@@ -49,29 +44,11 @@ function saveState(count, lastTs) {
     fs.writeFileSync(STATE_FILE, `count,last_ts\n${count},${lastTs}\n`, "utf8");
 }
 
-
 function countMatches(text) {
     if (!text) return 0;
     JAY_DONT_RE_GLOBAL.lastIndex = 0;
     const matches = text.match(JAY_DONT_RE_GLOBAL);
     return matches ? matches.length : 0;
-}
-
-
-function getCount() {
-    const lines = fs.readFileSync(FILE, "utf8").trim().split("\n");
-    const n = parseInt(lines[1] || "0", 10);    
-    return Number.isFinite(n) ? n : 0;
-}
-
-function setCount(n) {
-    fs.writeFileSync(FILE, `count\n${n}`, "utf8");
-}
-
-function incrementAndGet() {
-    const n = getCount() + 1;
-    setCount(n);
-    return n;
 }
 
 const app = new App({
@@ -102,7 +79,7 @@ app.event("message", async ({ event }) => {
         console.log(`Counted ${hits} => total ${newCount}`);
     } else {
         const newLastTs = Math.max(state.lastTs, msgTs);
-        if (newLastTs !== state.lastTs) saveState(state.count, newLasTs);
+        if (newLastTs !== state.lastTs) saveState(state.count, newLastTs);
     }
 });
 
@@ -112,7 +89,7 @@ app.command("/jaycheck", async ({ command, ack, respond, client }) => {
     const state = loadState();
     const text = `Total "jaydont" count: *${state.count}*`;
 
-    const threadTs = command.thread_ts || command.message.ts;
+    const threadTs = command.thread_ts || command.message_ts;
 
     if (threadTs) {
         await client.chat.postMessage({
@@ -127,17 +104,9 @@ app.command("/jaycheck", async ({ command, ack, respond, client }) => {
 
 app.command("/jaycount", async ({ ack, respond }) => {
     await ack();
-    const total = getCount();
-    await respond(`Total "jay dont": *${total}*`);
+    const state = loadState();
+    await respond(`Total "jay dont": *${state.count}*`);
 });
-
-async function sendDailyReport() {
-    const total = getCount();
-    await app.client.chat.postMessage({
-        channel: REPORT_CHANNEL_ID,
-        text: `Current number of jays: *${total}*`,
-    });
-}
 
 async function sendDailyReport() {
     const state = loadState();
@@ -178,14 +147,14 @@ async function backfillHistory() {
                 
                 total += countMatches(msg.text || "");
 
-                if (msg.thread_ts &&  msg.reply_count > 0) {
+                if (msg.thread_ts &&  (msg.reply_count || 0) > 0) {
                     let rCursor;
                     do {
                         const repliesRes = await app.client.conversations.replies({
                             channel,
                             ts: msg.thread_ts,
                             limit: 200,
-                            crusor: rCursor,
+                            cursor: rCursor,
                         });
 
                         const replies = repliesRes.messages || [];
