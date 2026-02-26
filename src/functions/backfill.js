@@ -31,16 +31,21 @@ module.exports = async function backfillHistory(app, config, options = {}) {
         fs.writeFileSync(STATE_FILE, `count,last_ts\n${count},${lastTs}\n`, "utf8");
     }
 
-    function loadBanSet() {
-        if (!BANLIST_FILE) return new Set();
-        if (!fs.existsSync(BANLIST_FILE)) return new Set();
+    function ensureBanFile() {
+        if (!fs.existsSync(BANLIST_FILE)) {
+        fs.writeFileSync(BANLIST_FILE, "# Banned users\n", "utf8");
+        }
+    }
 
+    function loadBanSet() {
+        ensureBanFile();
         const raw = fs.readFileSync(BANLIST_FILE, "utf8");
-        const ids = raw
-        .split(/\r?\n/)
-        .map((l) => l.trim())
-        .filter((l) => l.length > 0 && !l.startsWith("#"));
-        return new Set(ids);
+        return new Set(
+        raw
+            .split(/\r?\n/)
+            .map((l) => l.trim())
+            .filter((l) => l && !l.startsWith("#"))
+        );
     }
 
     function countMatches(text) {
@@ -51,21 +56,17 @@ module.exports = async function backfillHistory(app, config, options = {}) {
     }
 
     const state = loadState();
-
     if (!force && state.lastTs > 0) {
         return { skipped: true, total: state.count, newestSeen: state.lastTs };
     }
 
-    const oldest = Math.floor(Date.now() / 1000) - BACKFILL_DAYS * 24 * 60 * 60;
-
     const banSet = loadBanSet();
+    const oldest = Math.floor(Date.now() / 1000) - BACKFILL_DAYS * 24 * 60 * 60;
 
     let total = 0;
     let newestSeen = 0;
 
     for (const channel of ALLOWED_CHANNEL_IDS) {
-        console.log(`Backfill channel ${channel} (last ${BACKFILL_DAYS} days)...`);
-
         let cursor;
         do {
         const res = await app.client.conversations.history({
@@ -83,7 +84,7 @@ module.exports = async function backfillHistory(app, config, options = {}) {
 
             const hits = countMatches(msg.text || "");
 
-            if (hits > 3) continue;
+            if (hits >= 4) continue;
 
             total += hits;
         }
@@ -93,6 +94,5 @@ module.exports = async function backfillHistory(app, config, options = {}) {
     }
 
     saveState(total, newestSeen || 0);
-
     return { skipped: false, total, newestSeen: newestSeen || 0 };
 };

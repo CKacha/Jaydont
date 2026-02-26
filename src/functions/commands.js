@@ -1,37 +1,50 @@
 const fs = require("fs");
 
 module.exports = function registerCommands(app, config, backfillHistory) {
-  const { STATE_FILE, BANLIST_FILE } = config;
+  const { STATE_FILE, BANLIST_FILE, OWNER_USER_ID } = config;
+
+  function isOwner(userId) {
+    return userId === OWNER_USER_ID;
+  }
+
+  async function denyIfNotOwner(respond, userId) {
+    if (isOwner(userId)) return false;
+    await respond("You’re not allowed to use this command.");
+    return true;
+  }
 
   function loadState() {
     if (!fs.existsSync(STATE_FILE)) return { count: 0 };
-    const lines = fs.readFileSync(STATE_FILE, "utf8").split("\n");
+    const lines = fs.readFileSync(STATE_FILE, "utf8").split(/\r?\n/);
     const [count] = (lines[1] || "0,0").split(",");
-    return { count: parseInt(count) || 0 };
+    return { count: parseInt(count, 10) || 0 };
   }
 
-  function loadBanSet() {
+  function ensureBanFile() {
     if (!fs.existsSync(BANLIST_FILE)) {
       fs.writeFileSync(BANLIST_FILE, "# Banned users\n", "utf8");
     }
-
-    const raw = fs.readFileSync(BANLIST_FILE, "utf8");
-
-    const ids = raw
-      .split(/\r?\n/)
-      .map((l) => l.trim())
-      .filter((l) => l.length > 0 && !l.startsWith("#"));
-
-    return new Set(ids);
   }
 
-  function savesBanSet(banSet) {
-    const lines = ["# Banned users"];
+  function loadBanSet() {
+    ensureBanFile();
+    const raw = fs.readFileSync(BANLIST_FILE, "utf8");
+    return new Set(
+      raw
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .filter((l) => l && !l.startsWith("#"))
+    );
+  }
 
-    for (const id of banSet) {
-      lines.push(id);
-    }
+  function saveBanSet(set) {
+    const lines = ["# Banned users", ...Array.from(set)];
     fs.writeFileSync(BANLIST_FILE, lines.join("\n") + "\n", "utf8");
+  }
+
+  function parseMention(text) {
+    const m = text.trim().match(/^<@([A-Z0-9]+)>$/i);
+    return m ? m[1] : null;
   }
 
   app.command("/jaycount", async ({ ack, respond }) => {
@@ -46,68 +59,49 @@ module.exports = function registerCommands(app, config, backfillHistory) {
     await respond(`Total "jaydont": *${state.count}*`);
   });
 
-  app.command("/jaybackfill", async ({ ack, respond }) => {
+  app.command("/jaybackfill", async ({ ack, respond, command }) => {
     await ack();
+    if (await denyIfNotOwner(respond, command.user_id)) return;
 
     await respond("Rechecking history (backfill) now…");
 
     try {
       const result = await backfillHistory(app, config, { force: true });
-      await respond(
-        `Backfill done lets GO \nTotal: *${result.total}*\nNewest seen ts: *${result.newestSeen}*`
-      );
+      await respond(`Backfill done Total: *${result.total}*`);
     } catch (e) {
-      await respond(`Backfill failed \n${e?.data || e?.message || String(e)}`);
+      await respond(`Backfill failed \n${e?.data || e?.message || e}`);
     }
   });
 
   app.command("/jayban", async ({ ack, respond, command }) => {
     await ack();
+    if (await denyIfNotOwner(respond, command.user_id)) return;
 
-    const userMention = command.text.trim();
+    const userId = parseMention(command.text);
+    if (!userId) return respond("Usage: `/jayban @user`");
 
-    const match = userMention.match(/^<@([A-Z0-9]+)$/i);
-    if (!match) {
-      await respond("Use by: `/jayban @user`");
-      return;
-    }
+    const set = loadBanSet();
+    if (set.has(userId)) return respond("That user is already banned.");
 
-    const userId = match[1];
-    const banSet = loadBanSet();
+    set.add(userId);
+    saveBanSet(set);
 
-    if (banSet.has(userId)) {
-      await respond("User is already banned lmaoo");
-      return;
-    }
-
-    banSet.add(userId);
-    savesBanSet(banSet);
-
-    await respond(`User <@${userId}> has been banned from being counter :loll: `);
+    await respond(`Banned <@${userId}> from counting.`);
   });
 
-  app.commmand("/jayunban", async ({ ack, respond, command }) => {
+  app.command("/jayunban", async ({ ack, respond, command }) => {
     await ack();
+    if (await denyIfNotOwner(respond, command.user_id)) return;
 
-    const userMention = command.text.trim();
+    const userId = parseMention(command.text);
+    if (!userId) return respond("Usage: `/jayunban @user`");
 
-    const mathc = userMention.match(/^<@([A-Z0-9]+)$/i);
-    if (!match) {
-      await respond("Use `/jayunban @user`");
-      return;
-    }
+    const set = loadBanSet();
+    if (!set.has(userId)) return respond("That user is not banned.");
 
-    const userId = match[1];
-    const banSet = loadBanSet();
+    set.delete(userId);
+    saveBanSet(set);
 
-    if (!banSet.has(userId)) {
-      await respond("User is not banned :P");
-      return;
-    }
-
-    banSet.delete(userId);
-    savesBanSet(banSet);
-
-    await respond(`User <@${userId}> has been unbanned `);
+    await respond(`Unbanned <@${userId}>.`);
   });
 };

@@ -1,4 +1,5 @@
 require("dotenv").config();
+const path = require("path");
 const { App } = require("@slack/bolt");
 
 const registerMessageCounter = require("./functions/messageCounter");
@@ -7,21 +8,24 @@ const backfillHistory = require("./functions/backfill");
 const startDailyReport = require("./functions/dailyReport");
 
 const ALLOWED_CHANNEL_IDS = [
-  "C09KRBRRPEX", //campfire-bulletin
-  "C09PXLPEL2Y", //campfire
-  "C0A1X4BUD9N", //campfire-usa
+  "C09KRBRRPEX", // campfire-bulletin
+  "C09PXLPEL2Y", // campfire
+  "C0A1X4BUD9N", // campfire-usa
 ];
 
 const WATCH_ALL_INVITED_CHANNELS = false;
 
-const REPORT_CHANNEL_ID = "C0AGGGEBZFA"; //Jaydontreports
+const REPORT_CHANNEL_ID = "C0AGGGEBZFA"; // jaydontreports
 const REPORT_EVERY_MS = 24 * 60 * 60 * 1000;
 
 const BACKFILL_DAYS = 60;
 const JAY_DONT_RE_GLOBAL = /\bjay\s+don'?t\b/gi;
 
-const STATE_FILE = "jaydont_state.csv";
-const BANLIST_FILE = "banlist.txt"; 
+const STATE_FILE = path.join(__dirname, "../jaydont_state.csv");
+const BANLIST_FILE = path.join(__dirname, "../banlist.txt");
+const SPAM_FILE = path.join(__dirname, "../spam_state.json");
+
+const OWNER_USER_ID = "";
 
 const app = new App({
   token: process.env.SLACK_BOT_TOKEN,
@@ -47,18 +51,19 @@ const app = new App({
     JAY_DONT_RE_GLOBAL,
     STATE_FILE,
     BANLIST_FILE,
+    SPAM_FILE,
+    OWNER_USER_ID,
   };
 
   registerMessageCounter(app, config);
-
   registerCommands(app, config, backfillHistory);
 
   try {
     const result = await backfillHistory(app, config, { force: false });
     if (result?.skipped) console.log("Backfill skipped (already done)");
-    else console.log("Backfill complete");
+    else console.log(`Backfill done. Total=${result?.total ?? "?"}`);
   } catch (e) {
-    console.error("tf backfill failed", e?.data || e?.message || e);
+    console.error("Backfill failed:", e?.data || e?.message || e);
   }
 
   startDailyReport(app, config);
