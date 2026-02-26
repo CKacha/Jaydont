@@ -25,7 +25,7 @@ const STATE_FILE = path.join(__dirname, "../jaydont_state.csv");
 const BANLIST_FILE = path.join(__dirname, "../banlist.txt");
 const SPAM_FILE = path.join(__dirname, "../spam_state.json");
 
-const OWNER_USER_ID = "";
+const OWNER_USER_ID = "U0828FYS2UC";
 
 const app = new App({
   token: process.env.SLACK_BOT_TOKEN,
