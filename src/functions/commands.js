@@ -1,7 +1,62 @@
 const fs = require("fs");
+const { parse } = require("path");
 
-module.exports = function registerCommands(app, config, backfillHistory) {
+module.exports = function registerCommands(app, config, backfillHistory, searchApi) {
   const { STATE_FILE, BANLIST_FILE, OWNER_USER_ID } = config;
+
+  function parseSearchArgs(text) {
+    const trimmed = (text || "").trim();
+    if (!trimmed) return null;
+
+    const quoted = trimmed.match(/^"(.+)"\s+(\d+)$/);
+    if(quoted) {
+      return {
+        term: quoted[1].trim(),
+        days: parseInt(quoted[2], 10),
+      };
+    }
+
+    const parts = trimmed.split(/\s+/);
+    if (parts.length < 2) return null;
+
+    const days = parseInt(parts[parts.length - 1], 10);
+    if (Number.isNaN(days)) return null;
+
+    const term = parts.slice(0, -1).join(" ").trim();
+    if (!term) return null;
+
+    return {term, days};
+  }
+
+  function formatSearchResult(result) { {
+    const topChannels = result.perChannel
+      .filter((c) => !c.error && c.count > 0)
+      .slice(0, 10);
+
+    let lines = [
+      `Search term: *${result.term}*`,
+      `Days searched: *${result.days}*`,
+      `Total matches: *${result.total}*`,
+      `Channels scanned: *${result.channelsScanned}*`,
+      `Messages scanned: *${result.messagesScanned}*`,
+    ];
+    
+    if (topChannels.length) {
+      lines.push("", "*Top channels:*"); 
+      for (const ch of topChannels) {
+        lines.push(`• #${ch.channelName}: *${ch.count}*`)
+      }
+    } else {
+      lines.push("", "No matches found :loll:");
+    }
+
+    const errored = result.perChannel.filter((c) => c.error);
+    if (ErrorCode.length) {
+      lines.push("", `Skipped/errored channels: *${errored.length}*`);
+    }
+
+    return lines.join("\n");
+  }
 
   function isOwner(userId) {
     return userId === OWNER_USER_ID;
@@ -104,4 +159,32 @@ module.exports = function registerCommands(app, config, backfillHistory) {
 
     await respond(`Unbanned <@${userId}>.`);
   });
-};
+
+  app.command("/searchword", async ({ ack, respond, command }) => {
+    await ack();
+    const parsed = parseSearchArgs(command.text);
+
+    if (!parsed) {
+      await respond(
+        'Usage:\n• `/searchword hello 30`\n• `/searchword "jay dont" 14`'
+      );
+      return;
+    }
+
+    const {term, days} = parsed;
+
+    if (days < 1 || days > 365) {
+      await respond("Pls put a day range between 1 & 365");
+      return;
+    }
+
+    await respond(`Searching for *${term} in the last *${days}* days...`);
+    
+    try {
+      const result = 
+      await respond(format)
+    } catch (e) {
+      await respond(`Search failed: \n${e?.data?.error || e?.message || e}`);
+    }
+  });
+}}

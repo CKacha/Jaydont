@@ -6,11 +6,17 @@ const registerMessageCounter = require("./functions/messageCounter");
 const registerCommands = require("./functions/commands");
 const backfillHistory = require("./functions/backfill");
 const startDailyReport = require("./functions/dailyReport");
+const registerSearch = require("./functions/search");
 
+// maybe i should just make this a seperate txt file that it takes from...
 const ALLOWED_CHANNEL_IDS = [
   "C09KRBRRPEX", // campfire-bulletin
   "C09PXLPEL2Y", // campfire
   "C0A1X4BUD9N", // campfire-usa
+  // "" //meta 
+  // "" //
+  // "" //
+  // "" //
 ];
 
 const WATCH_ALL_INVITED_CHANNELS = false;
@@ -55,8 +61,10 @@ const app = new App({
     OWNER_USER_ID,
   };
 
+  const searchApi = registerSearch(app, config);
+
   registerMessageCounter(app, config);
-  registerCommands(app, config, backfillHistory);
+  registerCommands(app, config, backfillHistory, searchApi);
 
   try {
     const result = await backfillHistory(app, config, { force: false });
