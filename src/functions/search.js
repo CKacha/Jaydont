@@ -1,3 +1,5 @@
+// now this thing isnt even needed WHY
+
 const { ALL } = require("dns");
 const fs = require("fs");
 

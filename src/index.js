@@ -1,6 +1,7 @@
 require("dotenv").config();
 const path = require("path");
 const { App } = require("@slack/bolt");
+const { WebClient } = require("@slack/web-api");
 
 const registerMessageCounter = require("./functions/messageCounter");
 const registerCommands = require("./functions/commands");
@@ -13,10 +14,9 @@ const ALLOWED_CHANNEL_IDS = [
   "C09KRBRRPEX", // campfire-bulletin
   "C09PXLPEL2Y", // campfire
   "C0A1X4BUD9N", // campfire-usa
-  // "" //meta 
-  // "" //
-  // "" //
-  // "" //
+  // "C0188CY57PZ" //meta 
+  // "C0266FRGT" //annoucements
+  // "C09UT00LP9T" //alive people
 ];
 
 const WATCH_ALL_INVITED_CHANNELS = false;
@@ -38,10 +38,11 @@ const app = new App({
   appToken: process.env.SLACK_APP_TOKEN,
   socketMode: true,
 });
+const searchClient = new WebClient(process.env.SLACK_USER_TOKEN);
 
 (async () => {
-  if (!process.env.SLACK_BOT_TOKEN || !process.env.SLACK_APP_TOKEN) {
-    console.error("Missing SLACK_BOT_TOKEN or SLACK_APP_TOKEN env sob");
+  if (!process.env.SLACK_BOT_TOKEN || !process.env.SLACK_APP_TOKEN || !process.env.SLACK_USER_TOKEN) {
+    console.error("Missing SLACK_BOT_TOKEN/SLACK_APP_TOKEN/SLACK_USER_TOKEN env sob");
     process.exit(1);
   }
 
@@ -60,11 +61,9 @@ const app = new App({
     SPAM_FILE,
     OWNER_USER_ID,
   };
-
-  const searchApi = registerSearch(app, config);
-
+  
   registerMessageCounter(app, config);
-  registerCommands(app, config, backfillHistory, searchApi);
+  registerCommands(app, config, backfillHistory, searchClient);
 
   try {
     const result = await backfillHistory(app, config, { force: false });

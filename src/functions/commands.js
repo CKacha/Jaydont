@@ -1,62 +1,7 @@
 const fs = require("fs");
-const { parse } = require("path");
 
-module.exports = function registerCommands(app, config, backfillHistory, searchApi) {
-  const { STATE_FILE, BANLIST_FILE, OWNER_USER_ID } = config;
-
-  function parseSearchArgs(text) {
-    const trimmed = (text || "").trim();
-    if (!trimmed) return null;
-
-    const quoted = trimmed.match(/^"(.+)"\s+(\d+)$/);
-    if(quoted) {
-      return {
-        term: quoted[1].trim(),
-        days: parseInt(quoted[2], 10),
-      };
-    }
-
-    const parts = trimmed.split(/\s+/);
-    if (parts.length < 2) return null;
-
-    const days = parseInt(parts[parts.length - 1], 10);
-    if (Number.isNaN(days)) return null;
-
-    const term = parts.slice(0, -1).join(" ").trim();
-    if (!term) return null;
-
-    return {term, days};
-  }
-
-  function formatSearchResult(result) { {
-    const topChannels = result.perChannel
-      .filter((c) => !c.error && c.count > 0)
-      .slice(0, 10);
-
-    let lines = [
-      `Search term: *${result.term}*`,
-      `Days searched: *${result.days}*`,
-      `Total matches: *${result.total}*`,
-      `Channels scanned: *${result.channelsScanned}*`,
-      `Messages scanned: *${result.messagesScanned}*`,
-    ];
-    
-    if (topChannels.length) {
-      lines.push("", "*Top channels:*"); 
-      for (const ch of topChannels) {
-        lines.push(`• #${ch.channelName}: *${ch.count}*`)
-      }
-    } else {
-      lines.push("", "No matches found :loll:");
-    }
-
-    const errored = result.perChannel.filter((c) => c.error);
-    if (ErrorCode.length) {
-      lines.push("", `Skipped/errored channels: *${errored.length}*`);
-    }
-
-    return lines.join("\n");
-  }
+module.exports = function registerCommands(app, config, backfillHistory, searchClient) {
+  const { STATE_FILE, BANLIST_FILE, OWNER_USER_ID, ALLOWED_CHANNEL_IDS } = config;
 
   function isOwner(userId) {
     return userId === OWNER_USER_ID;
@@ -102,6 +47,102 @@ module.exports = function registerCommands(app, config, backfillHistory, searchA
     return m ? m[1] : null;
   }
 
+  function parseSearchArgs(text) {
+    const trimmed = (text || "").trim();
+    if (!trimmed) return null;
+
+    const quoted = trimmed.match(/^"(.*)"\s+(\d+)$/);
+    if (quoted) {
+      return {
+        term: quoted[1].trim(),
+        days: parseInt(quoted[2], 10),
+      };
+    }
+
+    const parts = trimmed.split(/\s+/);
+    if (parts.length < 2) return null;
+
+    const days = parseInt(parts[parts.length - 1], 10);
+    if (Number.isNaN(days)) return null;
+
+    const term = parts.slice(0, -1).join(" ").trim();
+    if (!term) return null;
+
+    return { term, days };
+  }
+
+  function escapeForSlackSearch(text) {
+    return text.replace(/"/g, '\\"');
+  }
+
+  function buildSlackSearchQuery(term, days, allowedChannelNames = []) {
+    const after = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10);
+
+    const quotedTerm = `"${escapeForSlackSearch(term)}"`;
+
+    if (!allowedChannelNames.length) {
+      return `${quotedTerm} after:${after}`;
+    }
+
+    const inParts = allowedChannelNames.map((name) => `in:${name}`);
+    return `${quotedTerm} after:${after} (${inParts.join(" OR ")})`;
+  }
+
+  async function getAllowedChannelNames(client, allowedIds) {
+    const names = [];
+
+    for (const channelId of allowedIds) {
+      try {
+        const info = await client.conversations.info({ channel: channelId });
+        const name = info.channel?.name;
+        if (name) names.push(name);
+      } catch {
+        // ignoring channels that aren't resolved(bc perm issues or whatnot)
+      }
+    }
+
+    return names;
+  }
+
+  async function countAllSearchResults(query) {
+    let page = 1;
+    let totalMatches = 0;
+    const perChannel = new Map();
+
+    while (true) {
+      const res = await searchClient.search.messages({
+        query,
+        count: 100,
+        page,
+        sort: "timestamp",
+        sort_dir: "desc",
+      });
+
+      const matches = res.messages?.matches || [];
+      if (!matches.length) break;
+
+      totalMatches += matches.length;
+
+      for (const msg of matches) {
+        const channelName = msg.channel?.name || "unknown";
+        perChannel.set(channelName, (perChannel.get(channelName) || 0) + 1);
+      }
+
+      const paging = res.messages?.paging;
+      if (!paging || page >= paging.pages) break;
+      page += 1;
+    }
+
+    return {
+      totalMatches,
+      perChannel: Array.from(perChannel.entries())
+        .map(([channelName, count]) => ({ channelName, count }))
+        .sort((a, b) => b.count - a.count),
+    };
+  }
+
   app.command("/jaycount", async ({ ack, respond }) => {
     await ack();
     const state = loadState();
@@ -124,7 +165,7 @@ module.exports = function registerCommands(app, config, backfillHistory, searchA
       const result = await backfillHistory(app, config, { force: true });
       await respond(`Backfill done Total: *${result.total}*`);
     } catch (e) {
-      await respond(`Backfill failed \n${e?.data || e?.message || e}`);
+      await respond(`Backfill failed\n${e?.data || e?.message || e}`);
     }
   });
 
@@ -160,31 +201,49 @@ module.exports = function registerCommands(app, config, backfillHistory, searchA
     await respond(`Unbanned <@${userId}>.`);
   });
 
-  app.command("/searchword", async ({ ack, respond, command }) => {
+  app.command("/searchword", async ({ ack, respond, command, client }) => {
     await ack();
-    const parsed = parseSearchArgs(command.text);
 
+    const parsed = parseSearchArgs(command.text);
     if (!parsed) {
-      await respond(
-        'Usage:\n• `/searchword hello 30`\n• `/searchword "jay dont" 14`'
-      );
+      await respond('Usage:\n`/searchword hello 30`\n`/searchword "jay dont" 14`');
       return;
     }
 
-    const {term, days} = parsed;
+    const { term, days } = parsed;
 
     if (days < 1 || days > 365) {
-      await respond("Pls put a day range between 1 & 365");
+      await respond("Please choose a day between 1 and 365.");
       return;
     }
 
-    await respond(`Searching for *${term} in the last *${days}* days...`);
-    
+    await respond(`Searching Slack for *${term}* in the last *${days}* days...`);
+
     try {
-      const result = 
-      await respond(format)
+      const allowedNames = await getAllowedChannelNames(client, ALLOWED_CHANNEL_IDS);
+      const query = buildSlackSearchQuery(term, days, allowedNames);
+
+      const result = await countAllSearchResults(query);
+
+      const top = result.perChannel.slice(0, 10);
+      const lines = [
+        `Search term: *${term}*`,
+        `Days searched: *${days}*`,
+        `Total matching messages: *${result.totalMatches}*`,
+      ];
+
+      if (top.length) {
+        lines.push("", "*Top channels:*");
+        for (const ch of top) {
+          lines.push(`• #${ch.channelName}: *${ch.count}*`);
+        }
+      }
+
+      lines.push("", `Query used: \`${query}\``);
+
+      await respond(lines.join("\n"));
     } catch (e) {
-      await respond(`Search failed: \n${e?.data?.error || e?.message || e}`);
+      await respond(`Search failed:\n${e?.data?.error || e?.message || e}`);
     }
   });
-}}
+};
