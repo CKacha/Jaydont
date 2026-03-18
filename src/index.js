@@ -7,7 +7,6 @@ const registerMessageCounter = require("./functions/messageCounter");
 const registerCommands = require("./functions/commands");
 const backfillHistory = require("./functions/backfill");
 const startDailyReport = require("./functions/dailyReport");
-const registerSearch = require("./functions/search");
 
 // maybe i should just make this a seperate txt file that it takes from...
 const ALLOWED_CHANNEL_IDS = [
